@@ -1,0 +1,4 @@
+#pragma once
+
+constexpr const int LED_GPIO = 25;
+constexpr const int BUTTON_GPIO = 16;
