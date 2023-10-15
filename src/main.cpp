@@ -139,7 +139,7 @@ void log_device_summary()
     message += "Device " + g_device_name + " is configured:\n";
     message += " - Board: " + std::string(ARDUINO_BOARD) + "\n";
     message += " - IP: " + std::string(WiFi.localIP().toString().c_str()) + "\n";
-    message += " - Flash memory: " + std::to_string(ESP.getFlashChipSize()) + "\n";
+    message += " - Flash memory: " + std::to_string(ESP.getFlashChipSize()) + " bytes";
     ESP_LOGI(NOSYNA_LOG_TAG, "%s", message.c_str());
 }
 
