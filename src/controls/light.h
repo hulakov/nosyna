@@ -1,7 +1,8 @@
 #pragma once
 
-#include "log.h"
 #include "mqtt/client.h"
+
+#include <esp_log.h>
 
 constexpr const char *LIGHT_LOG_TAG = "light";
 

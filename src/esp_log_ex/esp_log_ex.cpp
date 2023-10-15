@@ -3,7 +3,7 @@
 // #define LOG_LEVEL ESP_LOG_INFO
 // #define MY_ESP_LOG_LEVEL ESP_LOG_WARN
 
-#include "log.h"
+#include "esp_log_ex.h"
 
 #include <stdarg.h>
 #include <stdio.h>
