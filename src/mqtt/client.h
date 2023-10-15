@@ -10,6 +10,8 @@
 #include <string>
 #include <unordered_map>
 
+constexpr const char *MQTT_LOG_TAG = "mqtt";
+
 namespace mqtt
 {
 

@@ -2,7 +2,6 @@
 
 #include <esp_log.h>
 
-constexpr const char *MQTT_LOG_TAG = "mqtt";
 constexpr const char *HOME_ASSISTANT_STATUS = "homeassistant/status";
 
 namespace mqtt
@@ -46,7 +45,7 @@ void Client::callback(char *topic, byte *payload, unsigned int length)
         return;
     }
 
-    ESP_LOGI(MQTT_LOG_TAG, "Received subscrition from topic '%s': %s", topic, str.c_str());
+    ESP_LOGD(MQTT_LOG_TAG, "Received subscrition from topic '%s': %s", topic, str.c_str());
     const auto &handler = p->second;
     handler(str);
 }
@@ -55,7 +54,7 @@ bool Client::publish(const std::string &topic, const std::string &payload, const
 {
     if (m_pubsub.publish(topic.c_str(), payload.c_str()))
     {
-        ESP_LOGI(MQTT_LOG_TAG, "Publish to topic '%s':\n%s\n", topic.c_str(),
+        ESP_LOGD(MQTT_LOG_TAG, "Publish to topic '%s':\n%s\n", topic.c_str(),
                  prettyPayload.empty() ? payload.c_str() : prettyPayload.c_str());
         return true;
     }
@@ -82,7 +81,7 @@ bool Client::subscribe(const std::string &topic, std::function<void(const std::s
 {
     if (m_subscriptions.find(topic) != m_subscriptions.end())
     {
-        LOG_COLOR_W(MQTT_LOG_TAG, "Subscription '%s' already exists", topic.c_str());
+        ESP_LOGW(MQTT_LOG_TAG, "Subscription '%s' already exists", topic.c_str());
         return false;
     }
 
@@ -95,7 +94,10 @@ bool Client::subscribe(const std::string &topic, std::function<void(const std::s
 void Client::loop()
 {
     if (!m_pubsub.connected())
+    {
+        ESP_LOGI(MQTT_LOG_TAG, "Connection lost, reconnecting...");
         connect();
+    }
 
     m_pubsub.loop();
     send_pending_states();
@@ -179,17 +181,17 @@ void Client::add_switch(const std::string &id, const std::string &name, const st
     payload["command_topic"] = command_topic;
     payload["unique_id"] = m_device_id + "-" + id;
     payload["value_template"] = "{{ value_json." + id + "_state | is_defined }}";
-    payload["payload_on"] = "ON";
-    payload["payload_off"] = "OFF";
-    payload["state_on"] = "ON";
-    payload["state_off"] = "OFF";
+    payload["payload_on"] = state::ON;
+    payload["payload_off"] = state::OFF;
+    payload["state_on"] = state::ON;
+    payload["state_off"] = state::OFF;
 
     fill_device_info(payload);
 
     const auto discoveryTopic = make_sensor_discovery_topic("switch", m_device_id, id);
 
     publish(discoveryTopic, payload);
-    auto string_handler = [handler](const std::string &value) { handler(value == "ON"); };
+    auto string_handler = [handler](const std::string &value) { handler(value == state::ON); };
     subscribe(command_topic, string_handler);
 
     handler(false);
@@ -213,16 +215,16 @@ void Client::add_light(const std::string &id, const std::string &name, const std
     payload["brightness_command_topic"] = brightness_topic;
     payload["brightness_value_template"] = "{{ value_json." + id + "_brightness | is_defined }}";
 
-    payload["payload_on"] = "ON";
-    payload["payload_off"] = "OFF";
-    payload["brightness_scale"] = "255";
+    payload["payload_on"] = state::ON;
+    payload["payload_off"] = state::OFF;
+    payload["brightness_scale"] = std::to_string(brightness::MAX);
 
     fill_device_info(payload);
 
     const auto discoveryTopic = make_sensor_discovery_topic("light", m_device_id, id);
 
     publish(discoveryTopic, payload);
-    subscribe(command_topic, [state_handler](const std::string &value) { state_handler(value == "ON"); });
+    subscribe(command_topic, [state_handler](const std::string &value) { state_handler(value == state::ON); });
     subscribe(brightness_topic,
               [brightness_handler](const std::string &value) { brightness_handler(std::stoi(value)); });
 

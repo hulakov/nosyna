@@ -1,9 +1,12 @@
 #include "config.h"
+#include "secrets.h"
+
 #include "controls/button.h"
+#include "controls/common.h"
 #include "controls/light.h"
+
 #include "esp_log_ex/esp_log_ex.h"
 #include "mqtt/client.h"
-#include "secrets.h"
 
 #include <ArduinoOTA.h>
 #include <PubSubClient.h>
@@ -24,8 +27,8 @@ const std::string g_device_id = "nosyna-" + get_device_identity();
 const std::string g_device_name = "Nosyna (" + get_device_identity() + ")";
 mqtt::Client g_mqtt_client(MQTT_USERNAME, MQTT_PASSWORD, MQTT_HOSTNAME, MQTT_PORT, g_device_id, g_device_name);
 
-Light led(g_mqtt_client, LED_LIGHT_ID, LED_GPIO);
-Button button(BUTTON_GPIO);
+Light g_led(g_mqtt_client, LED_LIGHT_ID, LED_GPIO);
+Button g_button(BUTTON_GPIO);
 
 void setup_log()
 {
@@ -34,7 +37,9 @@ void setup_log()
     add_log_appender(
         [](const std::string &message) { g_mqtt_client.get_pubsub().publish("logs/nosyna", message.c_str()); });
 
-    esp_log_level_set(NOSYNA_LOG_TAG, ESP_LOG_VERBOSE);
+    esp_log_level_set(NOSYNA_LOG_TAG, ESP_LOG_INFO);
+    esp_log_level_set(CONTROLS_LOG_TAG, ESP_LOG_INFO);
+    esp_log_level_set(MQTT_LOG_TAG, ESP_LOG_INFO);
     esp_log_level_set("*", ESP_LOG_INFO);
 }
 
@@ -74,18 +79,24 @@ void setup_wifi(const char *ssid, const char *password)
 
 void setup_ota(const std::string &device_name)
 {
-    ESP_LOGI(NOSYNA_LOG_TAG, "Setup OTA");
+    ESP_LOGD(NOSYNA_LOG_TAG, "Setup OTA");
 
     ArduinoOTA.setHostname(device_name.c_str());
     ArduinoOTA.setPort(3232);
     // ArduinoOTA.setPassword("passwd");
 
-    ArduinoOTA.onStart([]() { ESP_LOGI(NOSYNA_LOG_TAG, "OTA onStart(): command=%d", ArduinoOTA.getCommand()); });
-    ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-        ESP_LOGI(NOSYNA_LOG_TAG, "OTA onProgress: %u/%u", progress, total);
+    ArduinoOTA.onStart([]() { ESP_LOGI(NOSYNA_LOG_TAG, "Start OTA update: command=%d", ArduinoOTA.getCommand()); });
+    auto last_percent = std::make_shared<unsigned int>(-1);
+    ArduinoOTA.onProgress([last_percent](unsigned int progress, unsigned int total) {
+        unsigned int percent = 100 * progress / total;
+        if (percent != *last_percent)
+        {
+            *last_percent = percent;
+            ESP_LOGI(NOSYNA_LOG_TAG, "OTA %u%%", percent);
+        }
     });
-    ArduinoOTA.onEnd([]() { ESP_LOGI(NOSYNA_LOG_TAG, "OTA onEnd()"); });
-    ArduinoOTA.onError([](ota_error_t error) { ESP_LOGI(NOSYNA_LOG_TAG, "OTA onError(): error=%d"); });
+    ArduinoOTA.onEnd([]() { ESP_LOGI(NOSYNA_LOG_TAG, "OTA finisted"); });
+    ArduinoOTA.onError([](ota_error_t error) { ESP_LOGI(NOSYNA_LOG_TAG, "OTA error: error=%d"); });
 
     ArduinoOTA.begin();
 
@@ -119,10 +130,10 @@ void setup_entities()
     });
 
     g_mqtt_client.add_light(LED_LIGHT_ID, "External LED", "outlet",
-                            std::bind(&Light::set_state, &led, std::placeholders::_1),
-                            std::bind(&Light::set_brightness, &led, std::placeholders::_1));
+                            std::bind(&Light::set_state, &g_led, std::placeholders::_1),
+                            std::bind(&Light::set_brightness, &g_led, std::placeholders::_1));
 
-    button.set_on_click([]() { led.toggle(); });
+    g_button.set_on_click([]() { g_led.toggle(); });
 }
 
 void log_device_summary()
@@ -130,8 +141,8 @@ void log_device_summary()
     std::stringstream ss;
     ss << "Device " << g_device_name << " is configured:" << std::endl;
     ss << " - Board: " << ARDUINO_BOARD << std::endl;
-    ss << " - IP: " << WiFi.localIP() << std::endl;
-    ss << " - Flash memory: " << ESP.getFlashChipSize();
+    ss << " - IP: " << WiFi.localIP().toString().c_str() << std::endl;
+    ss << " - Flash memory: " << ESP.getFlashChipSize() << " bytes";
     ESP_LOGI(NOSYNA_LOG_TAG, "%s", ss.str().c_str());
 }
 
@@ -151,5 +162,5 @@ void loop()
 {
     ArduinoOTA.handle();
     g_mqtt_client.loop();
-    button.loop();
+    g_button.loop();
 }
