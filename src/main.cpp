@@ -12,8 +12,6 @@
 #include <PubSubClient.h>
 #include <WiFi.h>
 
-#include <sstream>
-
 constexpr const char *NOSYNA_LOG_TAG = "nosyna";
 
 constexpr static const char *LED_LIGHT_ID = "led";
@@ -137,12 +135,12 @@ void setup_entities()
 
 void log_device_summary()
 {
-    std::stringstream ss;
-    ss << "Device " << g_device_name << " is configured:" << std::endl;
-    ss << " - Board: " << ARDUINO_BOARD << std::endl;
-    ss << " - IP: " << WiFi.localIP().toString().c_str() << std::endl;
-    ss << " - Flash memory: " << ESP.getFlashChipSize() << " bytes";
-    ESP_LOGI(NOSYNA_LOG_TAG, "%s", ss.str().c_str());
+    std::string message;
+    message += "Device " + g_device_name + " is configured:\n";
+    message += " - Board: " + std::string(ARDUINO_BOARD) + "\n";
+    message += " - IP: " + std::string(WiFi.localIP().toString().c_str()) + "\n";
+    message += " - Flash memory: " + std::to_string(ESP.getFlashChipSize()) + "\n";
+    ESP_LOGI(NOSYNA_LOG_TAG, "%s", message.c_str());
 }
 
 void setup()
