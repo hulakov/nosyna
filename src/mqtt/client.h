@@ -34,6 +34,7 @@ class Client final
 
     void set(const std::string &id, const std::string &property, const std::string &value);
     void set(const std::string &id, const std::string &property, int value);
+    void set(const std::string &id, const std::string &property, bool value);
 
     void send_pending_states();
 
@@ -46,8 +47,6 @@ class Client final
     void callback(char *topic, byte *payload, unsigned int length);
 
     void fill_device_info(JsonDocument &parentJson) const;
-
-    void set(const std::string &key, const std::string &value);
 
   private:
     WiFiClient m_wifi;

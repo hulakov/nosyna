@@ -26,8 +26,9 @@ std::string get_device_identity();
 const std::string g_device_id = "nosyna-" + get_device_identity();
 const std::string g_device_name = "Nosyna (" + get_device_identity() + ")";
 mqtt::Client g_mqtt_client(MQTT_USERNAME, MQTT_PASSWORD, MQTT_HOSTNAME, MQTT_PORT, g_device_id, g_device_name);
+Preferences g_preferences;
 
-Light g_led(g_mqtt_client, LED_LIGHT_ID, LED_GPIO);
+Light g_led(g_mqtt_client, g_preferences, LED_LIGHT_ID, "External LED", LED_GPIO);
 Button g_button(BUTTON_GPIO);
 
 void setup_log()
@@ -129,9 +130,7 @@ void setup_entities()
         }
     });
 
-    g_mqtt_client.add_light(LED_LIGHT_ID, "External LED", "outlet",
-                            std::bind(&Light::set_state, &g_led, std::placeholders::_1),
-                            std::bind(&Light::set_brightness, &g_led, std::placeholders::_1));
+    g_led.setup();
 
     g_button.set_on_click([]() { g_led.toggle(); });
 }
@@ -152,6 +151,7 @@ void setup()
     setup_serial();
     setup_wifi(WIFI_SSID, WIFI_PASSWORD);
     g_mqtt_client.setup();
+    g_preferences.begin("nosyna");
     setup_ota(g_device_name.c_str());
     setup_pins();
     setup_entities();

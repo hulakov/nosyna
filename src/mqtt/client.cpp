@@ -227,9 +227,6 @@ void Client::add_light(const std::string &id, const std::string &name, const std
     subscribe(command_topic, [state_handler](const std::string &value) { state_handler(value == state::ON); });
     subscribe(brightness_topic,
               [brightness_handler](const std::string &value) { brightness_handler(std::stoi(value)); });
-
-    state_handler(false);
-    brightness_handler(255);
 }
 
 void Client::set(const std::string &id, const std::string &property, const std::string &value)
@@ -247,6 +244,11 @@ void Client::set(const std::string &id, const std::string &property, const std::
 void Client::set(const std::string &id, const std::string &property, int value)
 {
     set(id, property, std::to_string(value));
+}
+
+void Client::set(const std::string &id, const std::string &property, bool value)
+{
+    set(id, property, std::string(value ? state::ON : state::OFF));
 }
 
 void Client::send_pending_states()
