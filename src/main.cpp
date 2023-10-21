@@ -19,10 +19,11 @@ constexpr static const char *BUILTIN_LED_ID = "builtin_led";
 constexpr static const char *TEMPERATURE_SENSOR_ID = "temperature";
 constexpr static const char *HUMIDITY_SENSOR_ID = "humidity";
 
-std::string get_device_identity();
+std::string get_device_mac();
 
-const std::string g_device_id = "nosyna-" + get_device_identity();
-const std::string g_device_name = "Nosyna (" + get_device_identity() + ")";
+const std::string g_mac = get_device_mac();
+const std::string g_device_id = "nosyna-" + g_mac;
+const std::string g_device_name = "Nosyna (" + g_mac + ")";
 mqtt::Client g_mqtt_client(MQTT_USERNAME, MQTT_PASSWORD, MQTT_HOSTNAME, MQTT_PORT, g_device_id, g_device_name);
 Preferences g_preferences;
 
@@ -42,18 +43,17 @@ void setup_log()
     esp_log_level_set("*", ESP_LOG_INFO);
 }
 
-std::string get_device_identity()
+std::string get_device_mac()
 {
     constexpr auto WL_MAC_ADDR_LENGTH = 6;
-    const uint16_t length = WL_MAC_ADDR_LENGTH + 1;
     uint8_t mac[WL_MAC_ADDR_LENGTH];
     WiFi.macAddress(mac);
 
-    std::string result(static_cast<size_t>(length), '\0');
-    snprintf(&result[0], length, "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-    result.pop_back();
+    constexpr uint16_t length = WL_MAC_ADDR_LENGTH * 2 + 1;
+    char buffer[length];
+    snprintf(buffer, length, "%02x%02x%02x%02x%02x%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-    return result;
+    return buffer;
 }
 
 void setup_serial()
@@ -63,6 +63,7 @@ void setup_serial()
 
 void setup_wifi(const char *ssid, const char *password)
 {
+    WiFi.setHostname(g_device_id.c_str());
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, password);
 
@@ -139,7 +140,8 @@ void log_device_summary()
     message += "Device " + g_device_name + " is configured:\n";
     message += " - Board: " + std::string(ARDUINO_BOARD) + "\n";
     message += " - IP: " + std::string(WiFi.localIP().toString().c_str()) + "\n";
-    message += " - Flash memory: " + std::to_string(ESP.getFlashChipSize()) + " bytes";
+    message += " - MAC: " + std::string(WiFi.macAddress().c_str()) + "\n";
+    message += " - Flash memory: " + std::to_string(ESP.getFlashChipSize() / 1024) + " KB";
     ESP_LOGI(NOSYNA_LOG_TAG, "%s", message.c_str());
 }
 
