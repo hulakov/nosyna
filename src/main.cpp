@@ -119,13 +119,13 @@ void setup_entities()
         {
             ESP_LOGI(NOSYNA_LOG_TAG, "Built-in LED ON");
             digitalWrite(LED_BUILTIN, LOW);
-            g_mqtt_client.set(BUILTIN_LED_ID, mqtt::prop::STATE, mqtt::state::ON);
+            g_mqtt_client.set(BUILTIN_LED_ID, mqtt::prop::STATE, true);
         }
         else
         {
             ESP_LOGI(NOSYNA_LOG_TAG, "Built-in LED OFF");
             digitalWrite(LED_BUILTIN, HIGH);
-            g_mqtt_client.set(BUILTIN_LED_ID, mqtt::prop::STATE, mqtt::state::OFF);
+            g_mqtt_client.set(BUILTIN_LED_ID, mqtt::prop::STATE, false);
         }
     });
 
