@@ -4,6 +4,7 @@
 #include "controls/button.h"
 #include "controls/common.h"
 #include "controls/light.h"
+#include "controls/temperature_and_humidity.h"
 
 #include "esp_log_ex/esp_log_ex.h"
 #include "mqtt/client.h"
@@ -29,6 +30,8 @@ Preferences g_preferences;
 
 Light g_led(g_mqtt_client, g_preferences, LED_LIGHT_ID, "External LED", LED_GPIO);
 Button g_button(BUTTON_GPIO);
+TemperatureAndHumidity g_temperature_and_humidity(g_mqtt_client, TEMPERATURE_SENSOR_ID, HUMIDITY_SENSOR_ID,
+                                                  "Sensor T&H", TEMPERATURE_AND_HUMIDITY_GPIO);
 
 void setup_log()
 {
@@ -112,8 +115,7 @@ void setup_pins()
 
 void setup_entities()
 {
-    g_mqtt_client.add_sensor(TEMPERATURE_SENSOR_ID, "Temperature", "temperature", "°C");
-    g_mqtt_client.add_sensor(HUMIDITY_SENSOR_ID, "Humidity", "humidity", "%");
+    g_temperature_and_humidity.setup();
     g_mqtt_client.add_switch(BUILTIN_LED_ID, "Built-in LED", "outlet", [](bool on) {
         if (on)
         {
@@ -163,4 +165,5 @@ void loop()
     ArduinoOTA.handle();
     g_mqtt_client.loop();
     g_button.loop();
+    g_temperature_and_humidity.loop();
 }

@@ -160,7 +160,7 @@ void Client::add_sensor(const std::string &id, const std::string &name, const st
     payload["device_class"] = device_class;
     payload["state_topic"] = "nosyna/" + m_device_id + "/state";
     payload["unique_id"] = m_device_id + "-" + id;
-    payload["value_template"] = "{{ value_json." + id + " | is_defined }}";
+    payload["value_template"] = "{{ value_json." + id + "_state | is_defined }}";
     if (!unit_of_measurement.empty())
         payload["unit_of_measurement"] = unit_of_measurement;
 
@@ -249,6 +249,12 @@ void Client::set(const std::string &id, const std::string &property, int value)
 void Client::set(const std::string &id, const std::string &property, bool value)
 {
     set(id, property, std::string(value ? state::ON : state::OFF));
+}
+
+void Client::set(const std::string &id, const std::string &property, float value)
+{
+    int rounded = int(value * 10);
+    set(id, property, std::to_string(rounded / 10) + "." + std::to_string(rounded % 10));
 }
 
 void Client::send_pending_states()

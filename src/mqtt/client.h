@@ -35,6 +35,7 @@ class Client final
     void set(const std::string &id, const std::string &property, const std::string &value);
     void set(const std::string &id, const std::string &property, int value);
     void set(const std::string &id, const std::string &property, bool value);
+    void set(const std::string &id, const std::string &property, float value);
 
     void send_pending_states();
 
