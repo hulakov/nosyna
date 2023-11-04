@@ -2,10 +2,7 @@
 
 #include "constants.h"
 
-#include <ArduinoJson.h>
-#include <PubSubClient.h>
-#include <WiFi.h>
-
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -20,8 +17,8 @@ class Client final
   public:
     Client(const std::string &user, const std::string &password, const std::string &hostname, uint16_t port,
            const std::string &device_id, const std::string &device_name);
+    ~Client();
 
-    PubSubClient &get_pubsub();
     void setup();
     void loop();
 
@@ -41,17 +38,14 @@ class Client final
 
   private:
     bool publish(const std::string &topic, const std::string &payload, const std::string &prettyPayload = "");
-    bool publish(const std::string &topic, const JsonDocument &payload);
     bool subscribe(const std::string &topic, std::function<void(const std::string &)> handler);
 
     void connect();
-    void callback(char *topic, byte *payload, unsigned int length);
-
-    void fill_device_info(JsonDocument &parentJson) const;
+    void callback(char *topic, uint8_t *payload, unsigned int length);
 
   private:
-    WiFiClient m_wifi;
-    PubSubClient m_pubsub;
+    struct Impl;
+    std::unique_ptr<Impl> m_impl;
 
     std::unordered_map<std::string, std::string> m_values;
     std::unordered_map<std::string, std::string> m_dirty_values;

@@ -1,16 +1,19 @@
-
-// #define TAG "myApp"
-// #define LOG_LEVEL ESP_LOG_INFO
-// #define MY_ESP_LOG_LEVEL ESP_LOG_WARN
-
 #include "esp_log_ex.h"
+
+#include <PubSubClient.h>
+#include <WiFi.h>
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <string>
 #include <vector>
 
+constexpr const char *LOG_LOG_TAG = "log";
+
 std::vector<Appender> g_appenders;
+
+WiFiClient g_wifi;
+PubSubClient g_pubsub(g_wifi);
 
 std::string format_string(const char *format, va_list args)
 {
@@ -49,4 +52,21 @@ void initialize_log()
 void add_log_appender(Appender appender)
 {
     g_appenders.push_back(std::move(appender));
+}
+
+void add_mqtt_log_appender(const std::string &device_id, const std::string &hostname, uint16_t port,
+                           const std::string &user, const std::string &password)
+{
+    ESP_LOGI(LOG_LOG_TAG, "Connecting to MQTT...");
+    g_pubsub.setServer(hostname.c_str(), port);
+    g_pubsub.setBufferSize(1024);
+    while (!g_pubsub.connect(device_id.c_str(), user.c_str(), password.c_str()))
+    {
+        delay(500);
+        ESP_LOGI(LOG_LOG_TAG, "Waiting MQTT...");
+    }
+
+    ESP_LOGI(LOG_LOG_TAG, "Connected to MQTT");
+
+    add_log_appender([](const std::string &message) { g_pubsub.publish("logs/nosyna", message.c_str()); });
 }

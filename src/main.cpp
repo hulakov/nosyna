@@ -37,8 +37,6 @@ void setup_log()
 {
     initialize_log();
     add_log_appender([](const std::string &message) { Serial.println(message.c_str()); });
-    add_log_appender(
-        [](const std::string &message) { g_mqtt_client.get_pubsub().publish("logs/nosyna", message.c_str()); });
 
     esp_log_level_set(NOSYNA_LOG_TAG, ESP_LOG_INFO);
     esp_log_level_set(CONTROLS_LOG_TAG, ESP_LOG_INFO);
@@ -152,6 +150,8 @@ void setup()
     setup_log();
     setup_serial();
     setup_wifi(WIFI_SSID, WIFI_PASSWORD);
+
+    add_mqtt_log_appender(g_device_id, MQTT_HOSTNAME, MQTT_PORT, MQTT_USERNAME, MQTT_PASSWORD);
     g_mqtt_client.setup();
     g_preferences.begin("nosyna");
     setup_ota(g_device_name.c_str());

@@ -1,5 +1,8 @@
 #include "client.h"
 
+#include <ArduinoJson.h>
+#include <PubSubClient.h>
+#include <WiFi.h>
 #include <esp_log.h>
 
 constexpr const char *HOME_ASSISTANT_STATUS = "homeassistant/status";
@@ -7,17 +10,35 @@ constexpr const char *HOME_ASSISTANT_STATUS = "homeassistant/status";
 namespace mqtt
 {
 
+struct Client::Impl
+{
+    Impl() : m_pubsub(m_wifi)
+    {
+    }
+
+    ~Impl()
+    {
+    }
+
+    WiFiClient m_wifi;
+    PubSubClient m_pubsub;
+};
+
 Client::Client(const std::string &user, const std::string &password, const std::string &hostname, uint16_t port,
                const std::string &device_id, const std::string &device_name)
-    : m_pubsub(m_wifi), m_user(user), m_password(password), m_hostname(hostname), m_port(port), m_device_id(device_id),
+    : m_impl(new Impl), m_user(user), m_password(password), m_hostname(hostname), m_port(port), m_device_id(device_id),
       m_device_name(device_name)
+{
+}
+
+Client::~Client()
 {
 }
 
 void Client::connect()
 {
     ESP_LOGI(MQTT_LOG_TAG, "Connecting to MQTT...");
-    while (!m_pubsub.connect(m_device_id.c_str(), m_user.c_str(), m_password.c_str()))
+    while (!m_impl->m_pubsub.connect(m_device_id.c_str(), m_user.c_str(), m_password.c_str()))
     {
         delay(500);
         ESP_LOGI(MQTT_LOG_TAG, "Waiting MQTT...");
@@ -34,7 +55,7 @@ void Client::connect()
     ESP_LOGI(MQTT_LOG_TAG, "Connected to MQTT");
 }
 
-void Client::callback(char *topic, byte *payload, unsigned int length)
+void Client::callback(char *topic, uint8_t *payload, unsigned int length)
 {
     const std::string str(reinterpret_cast<const char *>(payload), length);
 
@@ -52,7 +73,7 @@ void Client::callback(char *topic, byte *payload, unsigned int length)
 
 bool Client::publish(const std::string &topic, const std::string &payload, const std::string &prettyPayload)
 {
-    if (m_pubsub.publish(topic.c_str(), payload.c_str()))
+    if (m_impl->m_pubsub.publish(topic.c_str(), payload.c_str()))
     {
         ESP_LOGD(MQTT_LOG_TAG, "Publish to topic '%s':\n%s\n", topic.c_str(),
                  prettyPayload.empty() ? payload.c_str() : prettyPayload.c_str());
@@ -66,17 +87,6 @@ bool Client::publish(const std::string &topic, const std::string &payload, const
     }
 }
 
-bool Client::publish(const std::string &topic, const JsonDocument &payload)
-{
-    std::string str;
-    serializeJson(payload, str);
-
-    std::string prettyStr;
-    serializeJsonPretty(payload, prettyStr);
-
-    return publish(topic, str, prettyStr);
-}
-
 bool Client::subscribe(const std::string &topic, std::function<void(const std::string &)> handler)
 {
     if (m_subscriptions.find(topic) != m_subscriptions.end())
@@ -86,48 +96,57 @@ bool Client::subscribe(const std::string &topic, std::function<void(const std::s
     }
 
     m_subscriptions[topic] = handler;
-    m_pubsub.subscribe(topic.c_str());
+    m_impl->m_pubsub.subscribe(topic.c_str());
 
     return true;
 }
 
 void Client::loop()
 {
-    if (!m_pubsub.connected())
+    if (!m_impl->m_pubsub.connected())
     {
         ESP_LOGI(MQTT_LOG_TAG, "Connection lost, reconnecting...");
         connect();
     }
 
-    m_pubsub.loop();
+    m_impl->m_pubsub.loop();
     send_pending_states();
 }
 
 void Client::setup()
 {
     ESP_LOGI(MQTT_LOG_TAG, "Setup MQTT");
-    m_pubsub.setBufferSize(1024);
-    m_pubsub.setServer(m_hostname.c_str(), m_port);
-    m_pubsub.setCallback(
+    m_impl->m_pubsub.setBufferSize(1024);
+    m_impl->m_pubsub.setServer(m_hostname.c_str(), m_port);
+    m_impl->m_pubsub.setCallback(
         std::bind(&Client::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     connect();
 }
 
-PubSubClient &Client::get_pubsub()
-{
-    return m_pubsub;
-}
-
-void Client::fill_device_info(JsonDocument &parentJson) const
+void fill_device_info(JsonDocument &parentJson, const std::string device_name, const std::string &device_id)
 {
     JsonObject device = parentJson.createNestedObject("device");
-    device["name"] = m_device_name;
+    device["name"] = device_name;
     device["model"] = ARDUINO_BOARD;
     device["sw_version"] = "0.0.1";
     device["manufacturer"] = "Vadym";
 
     JsonArray identifiers = device.createNestedArray("identifiers");
-    identifiers.add(m_device_id);
+    identifiers.add(device_id);
+}
+
+std::string to_json(const JsonDocument &payload)
+{
+    std::string str;
+    serializeJson(payload, str);
+    return str;
+}
+
+std::string to_pretty_json(const JsonDocument &payload)
+{
+    std::string str;
+    serializeJsonPretty(payload, str);
+    return str;
 }
 
 inline std::string make_sensor_discovery_topic(const std::string &component, const std::string &device_id,
@@ -164,10 +183,10 @@ void Client::add_sensor(const std::string &id, const std::string &name, const st
     if (!unit_of_measurement.empty())
         payload["unit_of_measurement"] = unit_of_measurement;
 
-    fill_device_info(payload);
+    fill_device_info(payload, m_device_name, m_device_id);
 
     const auto discoveryTopic = make_sensor_discovery_topic("sensor", m_device_id, id);
-    publish(discoveryTopic, payload);
+    publish(discoveryTopic, to_json(payload), to_pretty_json(payload));
 }
 
 void Client::add_switch(const std::string &id, const std::string &name, const std::string &device_class,
@@ -186,11 +205,11 @@ void Client::add_switch(const std::string &id, const std::string &name, const st
     payload["state_on"] = state::ON;
     payload["state_off"] = state::OFF;
 
-    fill_device_info(payload);
+    fill_device_info(payload, m_device_name, m_device_id);
 
     const auto discoveryTopic = make_sensor_discovery_topic("switch", m_device_id, id);
 
-    publish(discoveryTopic, payload);
+    publish(discoveryTopic, to_json(payload), to_pretty_json(payload));
     auto string_handler = [handler](const std::string &value) { handler(value == state::ON); };
     subscribe(command_topic, string_handler);
 
@@ -219,11 +238,11 @@ void Client::add_light(const std::string &id, const std::string &name, const std
     payload["payload_off"] = state::OFF;
     payload["brightness_scale"] = std::to_string(brightness::MAX);
 
-    fill_device_info(payload);
+    fill_device_info(payload, m_device_name, m_device_id);
 
     const auto discoveryTopic = make_sensor_discovery_topic("light", m_device_id, id);
 
-    publish(discoveryTopic, payload);
+    publish(discoveryTopic, to_json(payload), to_pretty_json(payload));
     subscribe(command_topic, [state_handler](const std::string &value) { state_handler(value == state::ON); });
     subscribe(brightness_topic,
               [brightness_handler](const std::string &value) { brightness_handler(std::stoi(value)); });
@@ -268,7 +287,7 @@ void Client::send_pending_states()
     m_dirty_values.clear();
 
     const std::string stateTopic = make_state_topic(m_device_id);
-    publish(stateTopic, payload);
+    publish(stateTopic, to_json(payload), to_pretty_json(payload));
 }
 
 } // namespace mqtt
