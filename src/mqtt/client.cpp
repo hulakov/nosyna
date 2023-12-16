@@ -37,8 +37,8 @@ Client::~Client()
 
 void Client::connect()
 {
-    ESP_LOGI(MQTT_LOG_TAG, "Connecting to MQTT...");
-    while (!m_impl->m_pubsub.connect(m_device_id.c_str(), m_user.c_str(), m_password.c_str()))
+    ESP_LOGI(MQTT_LOG_TAG, "Connecting to MQTT (%s) ...", m_hostname.c_str());
+    while (!m_impl->m_pubsub.connect(m_hostname.c_str(), m_user.c_str(), m_password.c_str()))
     {
         delay(500);
         ESP_LOGI(MQTT_LOG_TAG, "Waiting MQTT...");
@@ -115,12 +115,13 @@ void Client::loop()
 
 void Client::setup()
 {
-    ESP_LOGI(MQTT_LOG_TAG, "Setup MQTT");
+    ESP_LOGI(MQTT_LOG_TAG, "Configuring MQTT...");
     m_impl->m_pubsub.setBufferSize(1024);
     m_impl->m_pubsub.setServer(m_hostname.c_str(), m_port);
     m_impl->m_pubsub.setCallback(
         std::bind(&Client::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
     connect();
+    ESP_LOGI(MQTT_LOG_TAG, "Configured MQTT");
 }
 
 void fill_device_info(JsonDocument &parentJson, const std::string device_name, const std::string &device_id)
